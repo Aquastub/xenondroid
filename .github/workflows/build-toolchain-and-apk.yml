@@ -1,0 +1,115 @@
+name: Build XenonDroidCC (toolchain + APK)
+
+# Manual trigger + on every push. This is the "no PC needed" part:
+# everything below runs on GitHub's Linux runners. You just download
+# the finished APK from the Actions run's artifacts / a Release.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-toolchain:
+    # Stage 1: cross-build binutils+gcc so the HOST is Android/ARM64
+    # and the TARGET is powerpc-xenon-elf. This is the part most
+    # likely to need real debugging — patch versions/flags here as
+    # build errors come up, this is a starting point, not a
+    # guaranteed-green build.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential texinfo bison flex \
+            libgmp-dev libmpfr-dev libmpc-dev wget git python3
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r26d
+
+      - name: Fetch xenon-toolchain sources
+        run: |
+          git clone --depth 1 https://github.com/Free60Project/xenon-toolchain.git
+          git clone --depth 1 https://github.com/Free60Project/libxenon.git
+
+      - name: Cross-build binutils (host=android-arm64, target=powerpc-xenon-elf)
+        env:
+          NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          # NOTE: this step is the crux of the whole project.
+          # xenon-toolchain's build-toolchain.sh assumes a normal Linux
+          # host build; here we instead configure binutils/gcc
+          # ourselves with --host pointing at the NDK's clang triple
+          # so the resulting compiler binaries run ON an Android
+          # device, while still emitting powerpc-xenon-elf code.
+          mkdir -p build/binutils && cd build/binutils
+          ../../xenon-toolchain/binutils-*/configure \
+            --target=powerpc-xenon-elf \
+            --host=aarch64-linux-android \
+            --prefix=/tmp/xenon-android-toolchain \
+            CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
+            --disable-nls --disable-werror
+          make -j$(nproc)
+          make install
+
+      - name: Cross-build gcc stage (target=powerpc-xenon-elf)
+        env:
+          NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          mkdir -p build/gcc && cd build/gcc
+          ../../xenon-toolchain/gcc-*/configure \
+            --target=powerpc-xenon-elf \
+            --host=aarch64-linux-android \
+            --prefix=/tmp/xenon-android-toolchain \
+            CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
+            --enable-languages=c,c++ --disable-nls --disable-libssp \
+            --with-newlib --disable-threads --disable-shared
+          make -j$(nproc) all-gcc
+          make install-gcc
+        continue-on-error: true # expected to need real iteration first run
+
+      - name: Package toolchain artifact
+        run: |
+          mkdir -p out
+          tar -czf out/xenon-android-toolchain.tar.gz -C /tmp xenon-android-toolchain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xenon-android-toolchain
+          path: out/xenon-android-toolchain.tar.gz
+
+  build-apk:
+    needs: build-toolchain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download toolchain artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: xenon-android-toolchain
+          path: app/src/main/assets/toolchain-raw
+
+      - name: Unpack toolchain into app assets
+        run: |
+          cd app/src/main/assets/toolchain-raw
+          tar -xzf xenon-android-toolchain.tar.gz
+          rm xenon-android-toolchain.tar.gz
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: XenonDroidCC-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk

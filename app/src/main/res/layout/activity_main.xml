@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <Button
+        android:id="@+id/btnPickSource"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="1. Choose source folder (.c/.cpp)" />
+
+    <TextView
+        android:id="@+id/txtSourcePath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No folder selected"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp" />
+
+    <Button
+        android:id="@+id/btnPickOutput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="2. Choose output folder (.xex goes here)" />
+
+    <TextView
+        android:id="@+id/txtOutputPath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No folder selected"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp" />
+
+    <Button
+        android:id="@+id/btnCompile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="3. Compile" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp">
+
+        <TextView
+            android:id="@+id/txtLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textSize="12sp"
+            android:text="Build log will appear here." />
+    </ScrollView>
+
+</LinearLayout>
