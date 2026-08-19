@@ -49,10 +49,3 @@ product yet. Three pieces, in order of how solid they are:
    folder, hit Compile.
 6. Wire up ELF→XEX conversion (step 3 above) before expecting
    anything to actually load in XenDroid.
-
-## Where this fits with RADSLA / TRTF
-
-Same as the libxenon `xenon-hello` scaffold from before: this doesn't
-convert Clickteam Fusion projects. It's the delivery mechanism for
-hand-ported C/C++ game logic — write it in the folder this app points
-at, compile it on-device, test the `.xex` in XenDroid.
