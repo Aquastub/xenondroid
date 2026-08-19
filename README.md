@@ -20,13 +20,27 @@ product yet. Three pieces, in order of how solid they are:
    build binutils+gcc with **host = Android/ARM64** and
    **target = powerpc-xenon-elf** (a "Canadian cross" build — the
    compiler itself runs on ARM, but it emits PowerPC code). This is
-   the single hardest part of the whole project. The xenon-toolchain
-   project was never designed for an Android host, so the configure
-   flags in the workflow are a starting guess, not a verified recipe.
-   **Expect the `Cross-build gcc stage` job to fail the first several
-   times** — that's normal for this kind of cross-cross build, not a
-   sign the idea is broken. Iterate on the configure/CC flags based
-   on the actual error output.
+   the single hardest part of the whole project.
+
+   There is no separate `Free60Project/xenon-toolchain` repo — an
+   earlier version of this workflow tried to clone one and failed
+   with a git credential-prompt error, because `git clone` on a
+   nonexistent/private https URL tries to prompt for a username, and
+   a CI runner has no terminal to answer it. The real toolchain build
+   script lives inside `libxenon` itself, at
+   `libxenon/toolchain/build-xenon-toolchain`. The workflow now
+   clones only `libxenon` and patches that script (via `sed`) to add
+   `--host=aarch64-linux-android` and an NDK `CC` to its configure
+   calls, instead of hand-writing configure invocations against
+   source paths that didn't exist.
+
+   That patch is still a first guess, not a verified recipe — the
+   script downloads old versions (e.g. gcc 4.6.1-era) that predate
+   modern Android NDK conventions, so **expect the toolchain job to
+   fail again, differently**. Read the actual build log it uploads,
+   adjust the `sed` pattern or add flags the log asks for, and
+   re-run. Iterating on real error output is the only way to move
+   this forward — I can't run or test the workflow from here.
 
 3. **ELF → XEX conversion (not implemented yet).** `MainActivity.kt`
    compiles down to a plain `.elf` and has a `TODO` where the

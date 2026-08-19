@@ -29,51 +29,45 @@ jobs:
         with:
           ndk-version: r26d
 
-      - name: Fetch xenon-toolchain sources
+      - name: Fetch libxenon (the toolchain build script lives inside it —
+              there is no separate Free60Project/xenon-toolchain repo)
         run: |
-          git clone --depth 1 https://github.com/Free60Project/xenon-toolchain.git
           git clone --depth 1 https://github.com/Free60Project/libxenon.git
 
-      - name: Cross-build binutils (host=android-arm64, target=powerpc-xenon-elf)
+      - name: Patch build-xenon-toolchain to target an Android-ARM64 host
         env:
           NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          # NOTE: this step is the crux of the whole project.
-          # xenon-toolchain's build-toolchain.sh assumes a normal Linux
-          # host build; here we instead configure binutils/gcc
-          # ourselves with --host pointing at the NDK's clang triple
-          # so the resulting compiler binaries run ON an Android
-          # device, while still emitting powerpc-xenon-elf code.
-          mkdir -p build/binutils && cd build/binutils
-          ../../xenon-toolchain/binutils-*/configure \
-            --target=powerpc-xenon-elf \
-            --host=aarch64-linux-android \
-            --prefix=/tmp/xenon-android-toolchain \
-            CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
-            --disable-nls --disable-werror
-          make -j$(nproc)
-          make install
+          # The stock script (libxenon/toolchain/build-xenon-toolchain)
+          # downloads binutils/gcc/gmp/mpfr/mpc itself and configures
+          # them for a normal Linux host. We inject --host + CC into
+          # every "configure --target=$TARGET" line it runs, so the
+          # resulting binutils/gcc binaries run ON Android/ARM64 while
+          # still emitting powerpc-xenon-elf code. This is the guess
+          # that most likely needs adjusting based on the real error
+          # output — the script was never written with this in mind.
+          ANDROID_CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          cd libxenon/toolchain
+          sed -i \
+            "s|configure --target=\$TARGET|configure --target=\$TARGET --host=aarch64-linux-android CC=$ANDROID_CC|g" \
+            build-xenon-toolchain
 
-      - name: Cross-build gcc stage (target=powerpc-xenon-elf)
+      - name: Run build-xenon-toolchain
         env:
           NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          PREFIX: ${{ github.workspace }}/xenon-android-toolchain
         run: |
-          mkdir -p build/gcc && cd build/gcc
-          ../../xenon-toolchain/gcc-*/configure \
-            --target=powerpc-xenon-elf \
-            --host=aarch64-linux-android \
-            --prefix=/tmp/xenon-android-toolchain \
-            CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
-            --enable-languages=c,c++ --disable-nls --disable-libssp \
-            --with-newlib --disable-threads --disable-shared
-          make -j$(nproc) all-gcc
-          make install-gcc
+          cd libxenon/toolchain
+          chmod +x build-xenon-toolchain
+          # PREFIX (env above) overrides the script's default
+          # /usr/local/xenon so no sudo is needed on the runner.
+          ./build-xenon-toolchain toolchain
         continue-on-error: true # expected to need real iteration first run
 
       - name: Package toolchain artifact
         run: |
           mkdir -p out
-          tar -czf out/xenon-android-toolchain.tar.gz -C /tmp xenon-android-toolchain
+          tar -czf out/xenon-android-toolchain.tar.gz -C "${{ github.workspace }}" xenon-android-toolchain
       - uses: actions/upload-artifact@v4
         with:
           name: xenon-android-toolchain
