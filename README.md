@@ -64,6 +64,14 @@ product yet. Three pieces, in order of how solid they are:
 6. Wire up ELF→XEX conversion (step 3 above) before expecting
    anything to actually load in XenDroid.
 
+## Note on the missing app icon
+
+The manifest doesn't set `android:icon` — a real icon needs actual
+mipmap image assets, which I can't generate reliably as binary files
+here. The app will install and run fine with Android's default
+placeholder icon; add a real one later via Android Studio's Image
+Asset tool whenever you're working on this from a PC.
+
 ## Note on the missing Gradle wrapper
 
 This scaffold doesn't include `gradlew` / `gradle-wrapper.jar` — those

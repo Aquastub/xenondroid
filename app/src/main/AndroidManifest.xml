@@ -3,7 +3,6 @@
 
     <application
         android:label="XenonDroidCC"
-        android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.Material3.DayNight">
         <activity
             android:name=".MainActivity"
